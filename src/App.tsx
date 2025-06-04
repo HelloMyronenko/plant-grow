@@ -1,5 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useState, useRef, Suspense } from 'react'
+import { Canvas } from '@react-three/fiber'
+import { OrbitControls, Environment, PerspectiveCamera } from '@react-three/drei'
 import { Leaf, Droplets, Sun, Wind } from 'lucide-react'
+import PlantScene from './components/PlantScene'
 
 interface GrowthStage {
   name: string
@@ -17,230 +20,42 @@ const growthStages: GrowthStage[] = [
 ]
 
 function App() {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [currentStage, setCurrentStage] = useState(0)
+  const [growthProgress, setGrowthProgress] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false)
   const animationRef = useRef<number>()
-  const progressRef = useRef(0)
 
-  const drawPlant = (ctx: CanvasRenderingContext2D, progress: number) => {
-    const canvas = ctx.canvas
-    const centerX = canvas.width / 2
-    const groundY = canvas.height - 50
-
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-
-    // Draw sky gradient
-    const skyGradient = ctx.createLinearGradient(0, 0, 0, groundY)
-    skyGradient.addColorStop(0, '#e0f2fe')
-    skyGradient.addColorStop(1, '#f0f9ff')
-    ctx.fillStyle = skyGradient
-    ctx.fillRect(0, 0, canvas.width, groundY)
-
-    // Draw ground
-    ctx.fillStyle = '#92400e'
-    ctx.fillRect(0, groundY, canvas.width, 50)
-    
-    // Draw soil texture
-    ctx.fillStyle = '#78350f'
-    for (let i = 0; i < 20; i++) {
-      const x = Math.random() * canvas.width
-      const y = groundY + Math.random() * 40 + 5
-      ctx.beginPath()
-      ctx.arc(x, y, Math.random() * 3 + 1, 0, Math.PI * 2)
-      ctx.fill()
-    }
-
-    // Draw seed/plant based on progress
-    if (progress < 20) {
-      // Draw seed
-      const seedY = groundY - 10
-      ctx.fillStyle = '#7c2d12'
-      ctx.beginPath()
-      ctx.ellipse(centerX, seedY, 8, 6, 0, 0, Math.PI * 2)
-      ctx.fill()
-    }
-
-    if (progress >= 20) {
-      // Draw roots
-      ctx.strokeStyle = '#f59e0b'
-      ctx.lineWidth = 2
-      const rootDepth = Math.min((progress - 20) * 2, 40)
-      
-      // Main root
-      ctx.beginPath()
-      ctx.moveTo(centerX, groundY)
-      ctx.lineTo(centerX, groundY + rootDepth)
-      ctx.stroke()
-      
-      // Side roots
-      for (let i = 0; i < 3; i++) {
-        ctx.beginPath()
-        ctx.moveTo(centerX, groundY + rootDepth * 0.5)
-        ctx.lineTo(centerX - 15 + i * 15, groundY + rootDepth * 0.8)
-        ctx.stroke()
-      }
-    }
-
-    if (progress >= 40) {
-      // Draw stem
-      const stemHeight = Math.min((progress - 40) * 3, 120)
-      ctx.strokeStyle = '#16a34a'
-      ctx.lineWidth = Math.min(progress / 20, 5)
-      ctx.beginPath()
-      ctx.moveTo(centerX, groundY)
-      ctx.lineTo(centerX, groundY - stemHeight)
-      ctx.stroke()
-
-      if (progress >= 60) {
-        // Draw leaves
-        const leafCount = Math.floor((progress - 60) / 10)
-        for (let i = 0; i < leafCount; i++) {
-          const leafY = groundY - stemHeight * (0.3 + i * 0.15)
-          const leafSize = 15 + i * 3
-          const side = i % 2 === 0 ? -1 : 1
-          
-          ctx.fillStyle = '#22c55e'
-          ctx.beginPath()
-          ctx.ellipse(centerX + side * 20, leafY, leafSize, leafSize / 2, side * 0.3, 0, Math.PI * 2)
-          ctx.fill()
-          
-          // Leaf vein
-          ctx.strokeStyle = '#16a34a'
-          ctx.lineWidth = 1
-          ctx.beginPath()
-          ctx.moveTo(centerX, leafY)
-          ctx.lineTo(centerX + side * 20, leafY)
-          ctx.stroke()
-        }
-      }
-
-      if (progress >= 90) {
-        // Draw flower
-        const flowerY = groundY - stemHeight - 10
-        const petalCount = 6
-        const petalSize = 12
-        
-        // Petals
-        ctx.fillStyle = '#fbbf24'
-        for (let i = 0; i < petalCount; i++) {
-          const angle = (i / petalCount) * Math.PI * 2
-          const petalX = centerX + Math.cos(angle) * 15
-          const petalY = flowerY + Math.sin(angle) * 15
-          
-          ctx.beginPath()
-          ctx.ellipse(petalX, petalY, petalSize, petalSize / 2, angle, 0, Math.PI * 2)
-          ctx.fill()
-        }
-        
-        // Center
-        ctx.fillStyle = '#f59e0b'
-        ctx.beginPath()
-        ctx.arc(centerX, flowerY, 8, 0, Math.PI * 2)
-        ctx.fill()
-      }
-    }
-
-    // Draw sun
-    ctx.fillStyle = '#fbbf24'
-    ctx.beginPath()
-    ctx.arc(canvas.width - 60, 60, 25, 0, Math.PI * 2)
-    ctx.fill()
-    
-    // Sun rays
-    ctx.strokeStyle = '#fbbf24'
-    ctx.lineWidth = 2
-    for (let i = 0; i < 8; i++) {
-      const angle = (i / 8) * Math.PI * 2
-      const x1 = canvas.width - 60 + Math.cos(angle) * 30
-      const y1 = 60 + Math.sin(angle) * 30
-      const x2 = canvas.width - 60 + Math.cos(angle) * 40
-      const y2 = 60 + Math.sin(angle) * 40
-      
-      ctx.beginPath()
-      ctx.moveTo(x1, y1)
-      ctx.lineTo(x2, y2)
-      ctx.stroke()
-    }
-  }
-
-  const animate = () => {
-    if (!canvasRef.current) return
-    const ctx = canvasRef.current.getContext('2d')
-    if (!ctx) return
-
-    progressRef.current += 0.5
-    if (progressRef.current > 100) {
-      progressRef.current = 100
-      setIsAnimating(false)
-      cancelAnimationFrame(animationRef.current!)
-      return
-    }
-
-    const stageIndex = growthStages.findIndex(stage => stage.progress >= progressRef.current)
-    if (stageIndex !== -1 && stageIndex !== currentStage) {
-      setCurrentStage(stageIndex)
-    }
-
-    drawPlant(ctx, progressRef.current)
-    animationRef.current = requestAnimationFrame(animate)
-  }
+  const currentStageIndex = growthStages.findIndex(stage => 
+    growthProgress <= stage.progress
+  ) || growthStages.length - 1
 
   const startAnimation = () => {
-    progressRef.current = 0
-    setCurrentStage(0)
+    if (isAnimating) return
     setIsAnimating(true)
+    setGrowthProgress(0)
+    
+    const animate = () => {
+      setGrowthProgress(prev => {
+        if (prev >= 100) {
+          setIsAnimating(false)
+          return 100
+        }
+        return prev + 0.5
+      })
+      animationRef.current = requestAnimationFrame(animate)
+    }
+    animate()
   }
 
   const resetAnimation = () => {
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current)
     }
-    progressRef.current = 0
-    setCurrentStage(0)
+    setGrowthProgress(0)
     setIsAnimating(false)
-    
-    if (canvasRef.current) {
-      const ctx = canvasRef.current.getContext('2d')
-      if (ctx) drawPlant(ctx, 0)
-    }
   }
 
-  useEffect(() => {
-    if (isAnimating) {
-      animate()
-    }
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current)
-      }
-    }
-  }, [isAnimating])
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    const resizeCanvas = () => {
-      canvas.width = canvas.offsetWidth
-      canvas.height = canvas.offsetHeight
-      drawPlant(ctx, progressRef.current)
-    }
-
-    resizeCanvas()
-    window.addEventListener('resize', resizeCanvas)
-
-    return () => {
-      window.removeEventListener('resize', resizeCanvas)
-    }
-  }, [])
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-50 to-amber-50">
+    <div className="min-h-screen bg-gradient-to-b from-sky-100 to-emerald-50">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-sm shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-6">
@@ -250,7 +65,7 @@ function App() {
             <Leaf className="w-8 h-8 text-green-600 scale-x-[-1]" />
           </div>
           <p className="text-center mt-2 text-gray-600 max-w-2xl mx-auto">
-            Watch the magical journey of a plant's life cycle, from a tiny seed to a beautiful flowering plant
+            Experience the magical journey of a plant's life cycle in stunning 3D
           </p>
         </div>
       </header>
@@ -258,14 +73,31 @@ function App() {
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Canvas Container */}
+          {/* 3D Canvas Container */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl shadow-lg p-6">
-              <canvas
-                ref={canvasRef}
-                className="w-full h-[400px] rounded-lg"
-                style={{ imageRendering: 'crisp-edges' }}
-              />
+              <div className="w-full h-[400px] rounded-lg overflow-hidden bg-gradient-to-b from-sky-200 to-sky-100">
+                <Canvas shadows>
+                  <PerspectiveCamera makeDefault position={[5, 5, 5]} />
+                  <OrbitControls 
+                    enablePan={false}
+                    minDistance={3}
+                    maxDistance={10}
+                    maxPolarAngle={Math.PI / 2}
+                  />
+                  <ambientLight intensity={0.5} />
+                  <directionalLight
+                    position={[5, 8, 3]}
+                    intensity={1}
+                    castShadow
+                    shadow-mapSize={[2048, 2048]}
+                  />
+                  <Suspense fallback={null}>
+                    <PlantScene growthProgress={growthProgress} />
+                    <Environment preset="forest" background={false} />
+                  </Suspense>
+                </Canvas>
+              </div>
               
               {/* Controls */}
               <div className="mt-6 flex gap-4 justify-center">
@@ -300,12 +132,18 @@ function App() {
                   </div>
                   <div>
                     <h3 className="font-medium text-gray-800">
-                      {growthStages[currentStage].name}
+                      {growthStages[currentStageIndex].name}
                     </h3>
                     <p className="text-sm text-gray-600">
-                      {growthStages[currentStage].description}
+                      {growthStages[currentStageIndex].description}
                     </p>
                   </div>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2 mt-4">
+                  <div 
+                    className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${growthProgress}%` }}
+                  />
                 </div>
               </div>
             </div>
