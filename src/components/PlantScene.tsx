@@ -119,6 +119,15 @@ function AppleTree({ growthProgress }: { growthProgress: number }) {
 export default function PlantScene({ growthProgress }: PlantSceneProps) {
   return (
     <>
+      {/* Lighting */}
+      <ambientLight intensity={0.5} />
+      <directionalLight
+        position={[10, 10, 5]}
+        intensity={1}
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+      />
+      
       <AppleTree growthProgress={growthProgress} />
       
       {/* Ground */}
